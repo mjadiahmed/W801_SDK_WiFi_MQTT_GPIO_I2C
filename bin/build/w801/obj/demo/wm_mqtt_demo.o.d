@@ -37,4 +37,4 @@
  ../include/net/wm_sockets2.0.3.h ../src/app/mqtt/libemqtt.h \
  ../include/driver/wm_i2c.h ../include/driver/wm_cpu.h \
  ../include/driver/wm_irq.h ../include/driver/wm_gpio_afsel.h \
- ../include/driver/wm_gpio.h
+ ../include/driver/wm_gpio.h I2C_utils.h

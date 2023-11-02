@@ -2,6 +2,9 @@
     "files.associations": {
         "wm_include.h": "c",
         "wm_demo.h": "c",
-        "wm_i2c.h": "c"
+        "wm_i2c.h": "c",
+        "ltr390.h": "c",
+        "i2c_utils.h": "c",
+        "wm_type_def.h": "c"
     }
 }
