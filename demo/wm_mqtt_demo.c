@@ -23,11 +23,16 @@
 #include "libemqtt.h"
 
 #include "wm_i2c.h"
-
+#include "wm_type_def.h"
 #include "wm_gpio_afsel.h"
 
+#define PIN_SCL WM_IO_PA_01
+#define PIN_SDA WM_IO_PA_04
+#define I2C_FREQ (200000)
+
+
+
 #if DEMO_MQTT
-#define I2C_FREQ		(200000)
 
 #define MQTT_DEMO_TASK_PRIO             39
 #define MQTT_DEMO_TASK_SIZE             512
@@ -474,18 +479,21 @@ static void mqtt_task(void *p)
         }
   
     }
+    
+    /*CONFIG I2C*/
+    wm_printf("send heart ping\r\n");
 
-//I2C
-      wm_i2c_scl_config(WM_IO_PA_01);
-    wm_i2c_sda_config(WM_IO_PA_04);
-
-    tls_i2c_init(I2C_FREQ);
+    wm_i2c_scl_config(PIN_SCL);
+	wm_i2c_sda_config(PIN_SDA);
+	tls_i2c_init(I2C_FREQ);
 
     for ( ; ; )
     {
-        i2c_scanner();
-        tls_os_time_delay(1000);
+	
+      i2c_scanner();
 
+      tls_os_time_delay(1000);
+    
         ret = tls_os_queue_receive(mqtt_demo_task_queue, (void **)&msg, 0, 0);
         if (!ret)
         {
@@ -554,38 +562,28 @@ void CreateMqttTAsk(){
 }
 
 
-void i2c_scanner(void){
-
-    wm_printf("Scanning for I2C devices...\n");
-
-    uint8_t dev_i2c[128] = {0};
+void i2c_scanner(void){  
+   
     int nDevices = 0;
 
-    for (uint8_t address = 1; address < 127; address++) {
-        tls_i2c_write_byte((address << 1), 1);
-        int error = tls_i2c_wait_ack();
+    wm_printf("I2C Address scanner started...\n\n");
+    for (uint8_t addr = 1; addr < 127; addr += 0x1)
+    {
+        tls_i2c_write_byte(addr << 1, 1);
         tls_i2c_stop();
 
-        if (error == WM_SUCCESS) {
-            dev_i2c[nDevices] = address;
+        if (!(tls_reg_read32(HR_I2C_CR_SR) & I2C_SR_NAK))
+        {
+            wm_printf("Device Found at address: 0x%.2x \n", addr);
             nDevices++;
-        } 
-        else  {
-            wm_printf("Unknown error at address [0x%X]\n", address);
         }
+        tls_os_time_delay(HZ * 0.0001);
     }
-
     if (nDevices == 0) {
         wm_printf("No I2C devices found.\n");
     } else {
-        wm_printf("Scan complete...\n");
-        for (int i = 0; i < nDevices; i++) {
-            wm_printf("Found I2C device at address [0x%X]\n", dev_i2c[i]);
-        }
-        wm_printf("Done...\n");
+        wm_printf("Scan complete...Found %d Devices\n",nDevices);
     }
-
-
 }
 
 

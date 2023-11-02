@@ -19,7 +19,7 @@
 
 void UserMain(void)
 {
-	printf("\n [d] W801 MQTT TEST - FreeRTOS - Built with Linux  By A.MJADI\n");
+	printf("\n [d] W801 MQTT TEST - FreeRTOS - Built under Linux  By A.MJADI\n");
 
 #if DEMO_CONSOLE
 	//CreateDemoTask();
