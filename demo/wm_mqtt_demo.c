@@ -70,7 +70,7 @@ static uint8_t mqtt_demo_packet_buffer[MQTT_DEMO_RECV_BUF_LEN_MAX];
 extern struct netif *tls_get_netif(void);
 extern int wm_printf(const char *fmt, ...);
 
-void i2c_scanner(void);
+void i2c_scanner(void); // works well
 
 static void mqtt_demo_net_status(u8 status)
 {
@@ -490,7 +490,7 @@ static void mqtt_task(void *p)
     for ( ; ; )
     {
 	
-      i2c_scanner();
+      i2c_scanner(); // works well
 
       tls_os_time_delay(1000);
     
@@ -562,10 +562,8 @@ void CreateMqttTAsk(){
 }
 
 
-void i2c_scanner(void){  
-   
+void i2c_scanner(void){   //works well
     int nDevices = 0;
-
     wm_printf("I2C Address scanner started...\n\n");
     for (uint8_t addr = 1; addr < 127; addr += 0x1)
     {
