@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "wm_include.h": "c",
+        "wm_demo.h": "c",
+        "wm_i2c.h": "c"
+    }
+}
