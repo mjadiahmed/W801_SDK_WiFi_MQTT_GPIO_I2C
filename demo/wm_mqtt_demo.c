@@ -56,6 +56,58 @@
 #define MQTT_DEMO_SERVER_ADDR          "test.mosquitto.org"
 #define MQTT_DEMO_SERVER_PORT           1883
 
+
+/*LTR390*/
+// LTR390 Sensor Register Addresses
+#define LTR390_ADDR       (0x53)
+#define LTR390_MAIN_CTRL  (0x00) // Main control register
+#define LTR390_MEAS_RATE  (0x04) // Resolution and data rate
+#define LTR390_GAIN       (0x05) // ALS and UVS gain range
+#define LTR390_ALSDATA    (0x0D) // ALS data lowest byte, 3 bytes
+#define LTR390_UVSDATA    (0x10) // UVS data lowest byte, 3 bytes
+
+// Measurement Resolution, Gain Setting, Measurement Rate
+#define RESOLUTION_20BIT_TIME400MS (0x00)
+#define RESOLUTION_19BIT_TIME200MS (0x10)
+#define RESOLUTION_18BIT_TIME100MS (0x20) // Default
+#define RESOLUTION_17BIT_TIME50MS  (0x3)
+#define RESOLUTION_16BIT_TIME25MS  (0x40)
+#define RESOLUTION_13BIT_TIME12_5MS  (0x50)
+#define RATE_25MS (0x0)
+#define RATE_50MS (0x1)
+#define RATE_100MS (0x2) // Default
+#define RATE_200MS (0x3)
+#define RATE_500MS (0x4)
+#define RATE_1000MS (0x5)
+#define RATE_2000MS (0x6)
+
+// Measurement Gain Range
+#define GAIN_1  (0x0)
+#define GAIN_3  (0x1) // Default
+#define GAIN_6  (0x2)
+#define GAIN_9  (0x3)
+#define GAIN_18 (0x4)
+
+// Constants for LTR390 sensor configuration
+#define UV_SENSITIVITY 1400
+#define WFAC 1.0
+
+/*BME680*/#define BME680_ADDR (0x76)  // You might need to adjust this address if you have a different sensor or address
+
+// BME680 registers
+#define BME680_REG_CTRL_MEAS (0x74)
+#define BME680_REG_TEMP_XLSB (0x22)
+#define BME680_REG_TEMP_LSB (0x23)
+#define BME680_REG_TEMP_MSB (0x24)
+
+// BME680 constants for sensor configuration
+#define BME680_TEMP_OS_1X (0x20)
+
+
+void i2c_init() ;
+void ltr390_init() ;
+int readLux() ;
+
 static bool mqtt_demo_inited = FALSE;
 static OS_STK mqtt_demo_task_stk[MQTT_DEMO_TASK_SIZE];
 static tls_os_queue_t *mqtt_demo_task_queue = NULL;
@@ -437,7 +489,7 @@ int mqtt_demo(void)
 // LEDS invers LOgic
 #define HIGH 0
 #define LOW 1
-char *SSID_ = "NXT-AP0" ;
+char *SSID_ = "Nextronic" ;
 char *PASS_ = "Next2021";
 
 
@@ -465,7 +517,7 @@ static void mqtt_task(void *p)
 
     // demo_connect_net(SSID_, PASS_);
 
-    demo_connect_net("NXT-AP0", "Next2021");
+    demo_connect_net("Nextronic", "Next2021");
     
     if (ether_if->status)
     {
@@ -481,19 +533,38 @@ static void mqtt_task(void *p)
     }
     
     /*CONFIG I2C*/
-    wm_printf("send heart ping\r\n");
+   // wm_printf("[d] Setup I2c\r\n");
+    /* wm_i2c_scl_config(PIN_SCL);
+	 wm_i2c_sda_config(PIN_SDA);
+	 tls_i2c_init(I2C_FREQ);*/
+   
+    i2c_init(); 
+   
+    ltr390_init();
 
-    wm_i2c_scl_config(PIN_SCL);
-	wm_i2c_sda_config(PIN_SDA);
-	tls_i2c_init(I2C_FREQ);
+    bme680_init() ;
 
     for ( ; ; )
     {
 	
-      i2c_scanner(); // works well
+        i2c_scanner(); // works well
 
-      tls_os_time_delay(1000);
+        int luxValue = readLux();
+        wm_printf("******************* Lux value: %d\n", luxValue);
+      
+        int temperature = readTemperature();
+        wm_printf("------------ Temperature: %d.%02d degrees Celsius\n", temperature / 100, temperature % 100);
     
+
+
+       tls_os_time_delay(2000);
+    
+        /*MQTT FUNCTIONS*/
+        // mqtt_demo_init();
+        // wm_printf("send heart ping\r\n");
+        // mqtt_ping(&mqtt_demo_mqtt_broker);
+
+
         ret = tls_os_queue_receive(mqtt_demo_task_queue, (void **)&msg, 0, 0);
         if (!ret)
         {
@@ -512,7 +583,8 @@ static void mqtt_task(void *p)
             case MQTT_DEMO_CMD_HEART:
                 wm_printf("send heart ping\r\n");
                 mqtt_ping(&mqtt_demo_mqtt_broker);
-                mqtt_publish(&mqtt_demo_mqtt_broker, (const char *)MQTT_DEMO_RX_PUB_TOPIC, (const char *)"Hello from W801 - A.M.", 22, 0);
+                //mqtt_publish(&mqtt_demo_mqtt_broker, (const char *)MQTT_DEMO_RX_PUB_TOPIC, (const char *)"Hello from W801 - A.M.", 22, 0);
+                i2c_scanner(); // works well
                 wm_printf("pushed: %s >>>%s\n", MQTT_DEMO_RX_PUB_TOPIC, msg);
                   for (int i = 0; i < 7; i++) // SETUP LEDS
                     {
@@ -539,7 +611,8 @@ static void mqtt_task(void *p)
                 break;
             }
         }
-    }
+          mqtt_publish(&mqtt_demo_mqtt_broker, "winnermicroMJ", "LOOP publishing", 16, 0);
+  }
 }
 
 
@@ -574,6 +647,12 @@ void i2c_scanner(void){   //works well
         {
             wm_printf("Device Found at address: 0x%.2x \n", addr);
             nDevices++;
+            //char buff1 [ 30 ]={0};
+            //snprintf(buff1, sizeof (buff1), "i2C bus: Found device at 0x%.2X", addr);
+            //wm_printf(buff1);
+            //mqtt_publish(&mqtt_demo_mqtt_broker, (const char *)MQTT_DEMO_RX_PUB_TOPIC, (const char *)buff1, sizeof (buff1), 0);
+            //tls_os_time_delay(HZ * 0.1);
+
         }
         tls_os_time_delay(HZ * 0.0001);
     }
@@ -581,10 +660,127 @@ void i2c_scanner(void){   //works well
         wm_printf("No I2C devices found.\n");
     } else {
         wm_printf("Scan complete...Found %d Devices\n",nDevices);
+
     }
+}
+
+void i2c_init() {
+    wm_i2c_scl_config(PIN_SCL);
+    wm_i2c_sda_config(PIN_SDA);
+    tls_i2c_init(I2C_FREQ);
+}
+
+
+// Initialize LTR390 sensor
+void ltr390_init() {
+    // Configure the LTR390 sensor by writing to its registers
+    // You can set the desired measurement rate, gain, and other parameters here
+    // For example:
+    // Set measurement rate to 100ms and gain to 3
+    
+    tls_i2c_write_byte(LTR390_ADDR << 1, 1);  // Write address
+    tls_i2c_wait_ack();
+
+    // Write LTR390_MEAS_RATE register with desired settings
+    tls_i2c_write_byte(LTR390_MEAS_RATE, 0);  // Register address
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(RESOLUTION_18BIT_TIME100MS, 0);  // Set resolution and measurement rate
+    tls_i2c_wait_ack();
+
+    // Write LTR390_GAIN register with desired gain
+    tls_i2c_write_byte(LTR390_GAIN, 0);  // Register address
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(GAIN_3, 0);  // Set gain
+    tls_i2c_wait_ack();
+
+    tls_i2c_stop();
+
+    // Optionally, you can configure other settings as needed
+}
+
+// Read Lux data from LTR390
+int readLux() {
+    u8 data[3];  // The sensor returns a 24-bit light value (LSB, Middle, and MSB)
+
+    // Start measurement
+    
+    tls_i2c_write_byte(LTR390_ADDR << 1, 1);  // Write address
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(LTR390_MAIN_CTRL, 0);  // Register address (optional if the sensor is already configured)
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(LTR390_MEAS_RATE, 0);  // Register address (optional if the sensor is already configured)
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(LTR390_GAIN, 0);  // Register address (optional if the sensor is already configured)
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(LTR390_MAIN_CTRL, 0);  // Register address (optional if the sensor is already configured)
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte((LTR390_ADDR << 1) | 1, 1);  // Read address
+    tls_i2c_wait_ack();
+
+    for (int i = 0; i < 3; i++) {
+        data[i] = tls_i2c_read_byte(i == 2 ? 0 : 1, i == 2 ? 1 : 0);
+    }
+
+    tls_i2c_stop();
+
+    // Combine the received data to form a 24-bit integer (little-endian format)
+    u32 luxValue = ((u32)data[0]) | ((u32)data[1] << 8) | ((u32)data[2] << 16);
+
+    // Calculate lux value
+    int lux = (int)((float)luxValue / (GAIN_3 * RESOLUTION_18BIT_TIME100MS));  // Adjust gain and resolution
+
+    return lux;
 }
 
 
 
+// Initialize BME680 sensor
+void bme680_init() {
+        // You can set other configurations as needed
+    u8 config = BME680_TEMP_OS_1X;
+
+    // Initialize the sensor and configure it
+    
+    tls_i2c_write_byte(BME680_ADDR << 1, 1);  // Write address
+    tls_i2c_wait_ack();
+
+    tls_i2c_write_byte(BME680_REG_CTRL_MEAS, 0);  // Register address
+    tls_i2c_wait_ack();
+    tls_i2c_write_byte(config, 0);  // Set temperature oversampling
+    tls_i2c_wait_ack();
+
+    tls_i2c_stop();
+}
+
+// Read temperature from BME680 sensor
+int readTemperature() {
+   i2c_init();
+    bme680_init();
+
+    // Read temperature
+    tls_i2c_write_byte(BME680_ADDR << 1, 1);  // Write address
+    tls_i2c_wait_ack();
+
+    tls_i2c_write_byte(BME680_REG_TEMP_XLSB, 1);  // Register address
+    tls_i2c_wait_ack();
+    tls_i2c_stop();
+
+    tls_i2c_write_byte((BME680_ADDR << 1) | 1, 1);  // Read address
+    tls_i2c_wait_ack();
+
+    u8 tempXLSB = tls_i2c_read_byte(1, 1);
+    u8 tempLSB = tls_i2c_read_byte(1, 1);
+    u8 tempMSB = tls_i2c_read_byte(0, 1);
+
+    tls_i2c_stop();
+
+    // Combine the received data to form a 16-bit integer (little-endian format)
+    int temperature = (int)((tempMSB << 12) | (tempLSB << 4) | (tempXLSB >> 4));
+
+    // Convert to temperature in degrees Celsius
+    float tempCelsius = (float)temperature / 100.0;
+
+    return (int)(tempCelsius * 100);  // Return temperature in 0.01 degrees Celsius}
+}
 #endif
 
